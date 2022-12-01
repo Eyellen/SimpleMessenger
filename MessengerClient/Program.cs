@@ -8,11 +8,13 @@ namespace MessengerClient
 {
     class Program
     {
+        const string eom = @"\eom";
+
+        static byte[] buffer = new byte[64];
+
         static IPEndPoint serverEndPoint = new IPEndPoint(IPAddress.Loopback, 15031);
         static Socket client = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-
-        static byte[] buffer = new byte[1024];
-
+        
         static void Main(string[] args)
         {
             Console.WriteLine("Client starting.");
@@ -34,7 +36,7 @@ namespace MessengerClient
 
             Task receiveHandler = Task.Run(() => HandleReceiveMessages());
             Task sendHandler = Task.Run(() => HandleSendMessages());
-            Console.WriteLine("Now you can send and received messages.");
+            Console.WriteLine("Now you can send and receive messages.");
 
             while (true) ;
 
@@ -46,10 +48,19 @@ namespace MessengerClient
         {
             while (true)
             {
-                int receivedBytesCount = client.Receive(buffer);
-                string receivedMessage = Encoding.UTF8.GetString(buffer, 0, receivedBytesCount);
+                int receivedBytesCount;
+                string receivedChunk;
+                string message = string.Empty;
 
-                Console.WriteLine($"<Server> {receivedMessage}");
+                do
+                {
+                    receivedBytesCount = client.Receive(buffer);
+                    receivedChunk = Encoding.UTF8.GetString(buffer, 0, receivedBytesCount);
+
+                    message += receivedChunk;
+                } while (!message.Contains(eom));
+
+                Console.WriteLine($"<Server> {message.Replace(eom, string.Empty)}");
             }
         }
 
@@ -57,7 +68,7 @@ namespace MessengerClient
         {
             while (true)
             {
-                string message = Console.ReadLine();
+                string message = Console.ReadLine() + eom;
                 byte[] messageBytes = Encoding.UTF8.GetBytes(message);
 
                 client.Send(messageBytes);
